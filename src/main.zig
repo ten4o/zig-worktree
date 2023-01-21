@@ -259,7 +259,6 @@ const WorktreeList = struct {
 };
 
 fn formatWorktree(allocator: Allocator, wt: git2.GitWorktree, width: usize) ![]const u8 {
-    //std.mem.set(u8, ..., ' ');
     var buf: [1024] u8 = undefined;
     std.mem.copy(u8, &buf, wt.path);
     std.mem.set(u8, buf[wt.path.len..width], ' ');

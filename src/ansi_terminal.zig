@@ -42,6 +42,7 @@ pub const AnsiTerminal = struct {
     }
     pub fn deinit(self: *Self) void {
         platform.restoreStdout(self.stdout.context.handle, self.tty_state) catch unreachable;
+        platform.restoreStdin(self.stdin.context.handle, self.tty_state) catch unreachable;
         _ = self.stdout.write(ansi.EXIT_SCREEN) catch unreachable;
     }
 

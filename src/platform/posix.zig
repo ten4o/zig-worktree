@@ -36,3 +36,7 @@ pub fn uncookStdin(handle: std.fs.File.Handle, saved_state: *TermAttr) !void {
 pub fn restoreStdout(handle: std.fs.File.Handle, prev_state: TermAttr) !void {
     try std.os.tcsetattr(handle, .FLUSH, prev_state);
 }
+pub fn restoreStdin(handle: std.fs.File.Handle, prev_state: TermAttr) !void {
+    _ = handle;
+    _ = prev_state;
+}

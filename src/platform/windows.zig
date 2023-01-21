@@ -22,17 +22,25 @@ const CP_UTF8 = 65001;
 pub fn uncookStdout(handle: std.fs.File.Handle, saved_state: *TermAttr) !void {
     var mode: DWORD = undefined;
     var res = std.os.windows.kernel32.GetConsoleMode(handle, &mode);
+    saved_state.*.stdout = mode;
+
     res = SetConsoleMode(handle, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
     _ = std.os.windows.kernel32.SetConsoleOutputCP(CP_UTF8);
-    saved_state.*.stdout = mode;
 }
 pub fn uncookStdin(handle: std.fs.File.Handle, saved_state: *TermAttr) !void {
     var mode: DWORD = undefined;
     var res = std.os.windows.kernel32.GetConsoleMode(handle, &mode);
-    res = SetConsoleMode(handle, (mode | ENABLE_VIRTUAL_TERMINAL_INPUT) & ~@as(DWORD, ENABLE_LINE_INPUT));
     saved_state.*.stdin = mode;
+
+    res = SetConsoleMode(handle, (mode | ENABLE_VIRTUAL_TERMINAL_INPUT) & ~@as(DWORD, ENABLE_LINE_INPUT));
 }
 pub fn restoreStdout(handle: std.fs.File.Handle, prev_state: TermAttr) !void {
     var res = SetConsoleMode(handle, prev_state.stdout);
     _ = res;
 }
+pub fn restoreStdin(handle: std.fs.File.Handle, prev_state: TermAttr) !void {
+    var res = SetConsoleMode(handle, prev_state.stdin);
+    _ = res;
+}
+
+

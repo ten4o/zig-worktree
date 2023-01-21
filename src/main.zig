@@ -263,8 +263,8 @@ fn ynDialog(top: u16, left: u16, text: []const u8, term: *AnsiTerminal) !u8 {
 }
 
 fn dicoverTempPath(allocator: Allocator) ![]const u8 {
-    if (std.process.hasEnvVarConstant("TEMPDIR")) {
-        return try std.process.getEnvVarOwned(allocator, "TEMPDIR");
+    if (std.process.hasEnvVarConstant("TMPDIR")) {
+        return try std.process.getEnvVarOwned(allocator, "TMPDIR");
     } else
     if (std.process.hasEnvVarConstant("TEMP")) {
         return try std.process.getEnvVarOwned(allocator, "TEMP");

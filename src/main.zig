@@ -191,6 +191,7 @@ const WorktreeList = struct {
     str_list: StringArrayList,
     //arena: std.heap.ArenaAllocator,
     allocator: Allocator,
+    max_path_width: usize,
 
     fn init(allocator: Allocator, repo: *git2.GitRepo) !Self {
         var self = Self{
@@ -204,13 +205,21 @@ const WorktreeList = struct {
             .list = undefined,
             //.arena = std.heap.ArenaAllocator.init(allocator),
             .allocator = allocator,
+            .max_path_width = 0,
         };
         //self.allocator = self.arena.allocator();
 
         self.list = try repo.getWorktreeList(self.allocator);
+        self.max_path_width = 0;
+        for (self.list.items) |*wt| {
+            if (wt.path.len > self.max_path_width) {
+                self.max_path_width = wt.path.len;
+            }
+        }
+
         self.str_list = try StringArrayList.initCapacity(self.allocator, self.list.items.len * 2);
         for (self.list.items) |*wt| {
-            self.str_list.addOneAssumeCapacity().* = try std.fmt.allocPrint(self.allocator, "{s} {s} [{s}]\n", .{ wt.path, wt.oid_as_str[0..6], wt.branch_name });
+            self.str_list.addOneAssumeCapacity().* = try formatWorktree(self.allocator, wt.*, self.max_path_width + 1);
         }
         return self;
     }
@@ -224,7 +233,8 @@ const WorktreeList = struct {
         return &self.sb_model;
     }
     fn appendOne(self: *Self, wt: git2.GitWorktree) !void {
-        const as_text = try std.fmt.allocPrint(self.allocator, "{s} {s} [{s}]\n", .{ wt.path, wt.oid_as_str[0..6], wt.branch_name });
+        const width = std.math.max(wt.path.len, self.max_path_width);
+        const as_text = try formatWorktree(self.allocator, wt, width);
         try self.str_list.append(as_text);
         try self.list.append(wt);
     }
@@ -247,6 +257,14 @@ const WorktreeList = struct {
         _ = self.str_list.orderedRemove(index);
     }
 };
+
+fn formatWorktree(allocator: Allocator, wt: git2.GitWorktree, width: usize) ![]const u8 {
+    //std.mem.set(u8, ..., ' ');
+    var buf: [1024] u8 = undefined;
+    std.mem.copy(u8, &buf, wt.path);
+    std.mem.set(u8, buf[wt.path.len..width], ' ');
+    return try std.fmt.allocPrint(allocator, "{s} {s} [{s}]\n", .{ buf[0..width], wt.oid_as_str[0..6], wt.branch_name });
+}
 
 fn ynDialog(top: u16, left: u16, text: []const u8, term: *AnsiTerminal) !u8 {
     var abuf = AnsiBuffer(1024).init();

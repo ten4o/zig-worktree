@@ -4,6 +4,7 @@ const allocator = std.heap.page_allocator;
 const ansi = @import("ansi_codes.zig");
 const platform = @import("platform.zig").platform;
 
+
 const TermSize = struct {
     width: i32,
     height: i32,
@@ -21,7 +22,7 @@ pub const AnsiTerminal = struct {
         const stdout_file = std.io.getStdOut();
         const stdout = stdout_file.writer();
         const stdin = stdin_file.reader();
-        const tsize = try detectSize();
+        const tsize = try detectSize(stdout_file);
 
         var tty_state: platform.TermAttr = undefined;
         try platform.uncookStdout(stdout_file.handle, &tty_state);
@@ -69,11 +70,25 @@ fn in(needle: u8, comptime slice: []const u8) bool {
     return false;
 }
 
-fn detectSize() !TermSize {
-    if (builtin.target.os.tag == .windows) {
-        return detectSizeWindows();
+fn detectSize(stdout_file: std.fs.File) !TermSize {
+    return switch (builtin.target.os.tag) {
+        .windows => detectSizeWindows(stdout_file),
+         else => detectSizePosix(stdout_file.handle),
+    } catch {
+        return detectSizeUgly();
+    };
+}
+
+fn detectSizePosix(handle: std.os.fd_t) !TermSize {
+    var size = std.mem.zeroes(platform.constants.winsize);
+    const err = std.os.system.ioctl(handle, platform.constants.T.IOCGWINSZ, @ptrToInt(&size));
+    if (std.os.errno(err) != .SUCCESS) {
+        return std.os.unexpectedErrno(@intToEnum(std.os.system.E, err));
     }
-    return detectSizeUgly();
+    return TermSize {
+        .width = size.ws_col,
+        .height = size.ws_row,
+    };
 }
 
 fn detectSizeUgly() !TermSize {
@@ -103,10 +118,8 @@ fn detectSizeUgly() !TermSize {
     return tsize;
 }
 
-fn detectSizeWindows() !TermSize {
+fn detectSizeWindows(stdout_file: std.fs.File) !TermSize {
     var info: std.os.windows.CONSOLE_SCREEN_BUFFER_INFO = undefined;
-    const stdout_file = std.io.getStdOut();
-    const stdout = stdout_file.writer();
     const res = std.os.windows.kernel32.GetConsoleScreenBufferInfo(stdout_file.handle, &info);
     if (res > 0) {
         return .{
@@ -117,6 +130,7 @@ fn detectSizeWindows() !TermSize {
         };
     }
     const err = std.os.windows.kernel32.GetLastError();
+    const stdout = stdout_file.writer();
     try stdout.print("console buf info error {}\n", .{err});
     return error.AccessDenied;
 }

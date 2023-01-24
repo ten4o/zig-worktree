@@ -1,14 +1,15 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-const constants = switch (builtin.target.os.tag) {
+pub const constants = switch (builtin.target.os.tag) {
     .windows => unreachable,
-    .freebsd, .openbsd, .netbsd, .linux => std.os.linux,
-    .macos => std.c,
+    .linux => std.os.linux,
+    .freebsd, .openbsd, .netbsd, .macos => std.c,
     else => {
         @compileError("Platform is not supported!");
     },
 };
+
 pub const TermAttr = constants.termios;
 
 pub fn uncookStdout(handle: std.fs.File.Handle, saved_state: *TermAttr) !void {

@@ -3,6 +3,7 @@ const c = @cImport({
 });
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const assert = std.debug.assert;
 
 pub const GitError = error{
     ERROR, // Generic error
@@ -43,11 +44,22 @@ pub const GitWorktree = struct {
     branch_name: []const u8,
     oid_as_str: [16]u8 = undefined,
     wt: ?*c.git_worktree = null,
+    is_main: bool = false,
 
     pub fn delete(self: *Self) !void {
         try std.fs.deleteTreeAbsolute(self.path);
         const rc = c.git_worktree_prune(self.wt, null);
         try translateError(rc);
+    }
+
+    fn addBranchNameAndOid(self: *Self, ref: *c.git_reference) GitError!void {
+        var branch_name: [*c]const u8 = undefined;
+        var rc = c.git_branch_name(&branch_name, ref);
+        try translateError(rc);
+
+        self.branch_name = std.mem.sliceTo(branch_name, 0);
+        var oid = c.git_reference_target(ref);
+        _ = c.git_oid_tostr(&self.oid_as_str, 15, oid);
     }
 };
 
@@ -62,33 +74,68 @@ pub const GitRepo = struct {
         try translateError(rc);
     }
 
+    pub fn close(self: *Self) void {
+        if (self.repo) |repo| {
+            c.git_repository_free(repo); 
+        }
+    }
+
     pub fn getWorktreeByName(self: *Self, name: [*c]const u8, wt: *GitWorktree) GitError!void {
+        assert(self.repo != null);
         var rc = c.git_worktree_lookup(&wt.wt, self.repo, name);
         try translateError(rc);
+        try self.getWorktreeByHandle(wt);
+    }
 
+    // pre: wt.wt MUST be set
+    fn getWorktreeByHandle(self: *Self, wt: *GitWorktree) GitError!void {
+        assert(wt.wt != null);
+        const name = c.git_worktree_name(wt.wt);
+        wt.name = std.mem.sliceTo(name, 0);
         wt.path = std.mem.sliceTo(c.git_worktree_path(wt.wt), 0);
-        wt.name = std.mem.sliceTo(c.git_worktree_name(wt.wt), 0);
+        wt.is_main = false;
+
         var ref: ?*c.git_reference = null;
-        rc = c.git_repository_head_for_worktree(&ref, self.repo, name);
+        var rc = c.git_repository_head_for_worktree(&ref, self.repo, name);
         try translateError(rc);
 
-        var branch_name: [*c]const u8 = undefined;
-        rc = c.git_branch_name(&branch_name, ref);
+        try wt.addBranchNameAndOid(ref.?);
+    }
+
+    fn getMainWorktree(self: *Self, wt: *GitWorktree) GitError!void {
+        assert(self.repo != null);
+        var common_dir = std.mem.sliceTo(c.git_repository_commondir(self.repo), 0);
+        var last = common_dir.len - 1;
+        if (common_dir[last] == '/') last -= 1;
+        while (common_dir[last] != '/') : (last -= 1) {}
+
+        var repo = GitRepo{};
+        wt.path = common_dir[0..last];
+        try repo.open(wt.path);
+        defer repo.close();
+
+        var ref: ?*c.git_reference = null;
+        var rc = c.git_repository_head(&ref, repo.repo);
         try translateError(rc);
 
-        wt.branch_name = std.mem.sliceTo(branch_name, 0);
-        var oid = c.git_reference_target(ref);
-        _ = c.git_oid_tostr(&wt.oid_as_str, 15, oid);
+        try wt.addBranchNameAndOid(ref.?);
+        wt.name = wt.branch_name;
+        wt.is_main = true;
     }
 
     pub fn getWorktreeList(self: *Self, allocator: Allocator) !GitWorktreeArrayList {
+        assert(self.repo != null);
         var worktrees: c.git_strarray = undefined;
         var rc = c.git_worktree_list(&worktrees, self.repo);
         try translateError(rc);
 
         defer _ = c.git_strarray_free(&worktrees);
 
-        var gwal = try GitWorktreeArrayList.initCapacity(allocator, worktrees.count * 2);
+        var gwal = try GitWorktreeArrayList.initCapacity(allocator, (worktrees.count + 4) * 2);
+
+        var wt: * GitWorktree = gwal.addOneAssumeCapacity();
+        try self.getMainWorktree(wt);
+
         if (worktrees.count > 0) {
             var i: usize = 0;
             while (i < worktrees.count) : (i += 1) {
@@ -99,6 +146,7 @@ pub const GitRepo = struct {
     }
 
     pub fn addWorktree(self: *Self, name: []const u8, path: []const u8) !GitWorktree {
+        assert(self.repo != null);
         var add_opt: c.git_worktree_add_options = undefined;
         add_opt.version = c.GIT_WORKTREE_ADD_OPTIONS_VERSION;
         add_opt.lock = 0;
@@ -122,6 +170,7 @@ pub const GitRepo = struct {
     }
 
     pub fn getBranchList(self: *Self, allocator: Allocator, remote: bool) ![][]const u8 {
+        assert(self.repo != null);
         const size = try self.getBranchListPriv(null, remote);
         var branch_list = try allocator.alloc([]const u8, size);
         _ = try self.getBranchListPriv(branch_list, remote);

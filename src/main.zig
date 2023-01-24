@@ -74,6 +74,7 @@ const App = struct {
             self.allocator.free(branch_list);
             self.branch_list = null;
         }
+        self.repo.close();
     }
 
     fn eventLoop(self: *Self) !void {
@@ -137,22 +138,27 @@ const App = struct {
             },
             KEY_BIND.DELETE => {
                 if (!self.main_sb.isEmpty()) {
-                    var wt = self.wt_list.list.items[self.main_sb.selected];
-                    var text = try std.fmt.allocPrint(self.allocator, "Deleting worktree {s} ... Are you sure? (y/n)", .{wt.name});
-                    defer self.allocator.free(text);
                     const dialog_top = self.main_sb.box.top + self.main_sb.box.height - 2;
                     const dialog_left = self.main_sb.box.left + 2;
-                    const yn = try ynDialog(dialog_top, dialog_left, text, self.term);
-                    if (yn == 'y') {
-                        if (wt.delete()) {
-                            self.main_sb.deleteSelected();
-                            try self.main_sb.box.clear(self.term.stdout);
-                            self.main_sb.box.height -= 1;
-                        } else |err| {
-                            try self.stderr.writer().print("error {}\n", .{err});
+                    var wt = self.wt_list.list.items[self.main_sb.selected];
+                    if (wt.is_main) {
+                        const text = "Main worktree cannot be deleted!";
+                        try statusMessage(dialog_top, dialog_left, text, self.term);
+                    } else {
+                        var text = try std.fmt.allocPrint(self.allocator, "Deleting worktree {s} ... Are you sure? (y/n)", .{wt.name});
+                        defer self.allocator.free(text);
+                        const yn = try ynDialog(dialog_top, dialog_left, text, self.term);
+                        if (yn == 'y') {
+                            if (wt.delete()) {
+                                self.main_sb.deleteSelected();
+                                try self.main_sb.box.clear(self.term.stdout);
+                                self.main_sb.box.height -= 1;
+                            } else |err| {
+                                try self.stderr.writer().print("error {}\n", .{err});
+                            }
                         }
+                        try self.main_sb.draw(self.term.stdout);
                     }
-                    try self.main_sb.draw(self.term.stdout);
                 }
             },
             else => {},
@@ -277,6 +283,13 @@ fn ynDialog(top: u16, left: u16, text: []const u8, term: *AnsiTerminal) !u8 {
             return kbuf[0];
         }
     }
+}
+
+fn statusMessage(top: u16, left: u16, text: []const u8, term: *AnsiTerminal) !void {
+    var abuf = AnsiBuffer(1024).init();
+    abuf.cursorPos(top, left);
+    abuf.concat(text);
+    try term.stdout.writeAll(abuf.toSlice());
 }
 
 fn dicoverTempPath(allocator: Allocator) ![]const u8 {

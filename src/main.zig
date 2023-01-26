@@ -175,12 +175,19 @@ const App = struct {
             KEY_BIND.SELECT1, KEY_BIND.SELECT2 => {
                 if (!self.branch_sb.?.isEmpty()) {
                     const branch_name = self.branch_list.?[self.branch_sb.?.selected];
-                    var path = try std.fmt.allocPrintZ(self.allocator, "../{s}", .{branch_name});
-                    defer self.allocator.free(path);
-                    var newwt = try self.repo.addWorktree(branch_name, path);
-                    try self.wt_list.appendOne(newwt);
-                    self.main_sb.box.height += 1;
-                    return 0;
+                    if (self.wt_list.findByBranchName(branch_name)) |_| {
+                        const dialog_top = self.branch_sb.?.box.top + self.branch_sb.?.box.height - 2;
+                        const dialog_left = self.branch_sb.?.box.left + 2;
+                        const text = "This branch is already binded to a worktree.";
+                        try statusMessage(dialog_top, dialog_left, text, self.term);
+                    } else {
+                        var path = try std.fmt.allocPrintZ(self.allocator, "../{s}", .{branch_name});
+                        defer self.allocator.free(path);
+                        var newwt = try self.repo.addWorktree(branch_name, path);
+                        try self.wt_list.appendOne(newwt);
+                        self.main_sb.box.height += 1;
+                        return 0;
+                    }
                 }
             },
             else => {},
@@ -235,6 +242,16 @@ const WorktreeList = struct {
         // FIXME:
         //self.arena.deinit();
     }
+
+    fn findByBranchName(self: Self, name: []const u8) ?*git2.GitWorktree {
+        for (self.list.items) |*wt_item| {
+            if (std.mem.eql(u8, wt_item.branch_name, name)) {
+                return wt_item;
+            }
+        }
+        return null;
+    }
+
     fn asSBModel(self: *Self) *select_box.SBModel {
         return &self.sb_model;
     }

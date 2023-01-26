@@ -123,7 +123,7 @@ pub const GitRepo = struct {
         wt.is_main = true;
     }
 
-    pub fn getWorktreeList(self: *Self, allocator: Allocator) !GitWorktreeArrayList {
+    pub fn getWorktreeList(self: *Self, allocator: Allocator) (Allocator.Error||GitError)!GitWorktreeArrayList {
         assert(self.repo != null);
         var worktrees: c.git_strarray = undefined;
         var rc = c.git_worktree_list(&worktrees, self.repo);
@@ -145,7 +145,7 @@ pub const GitRepo = struct {
         return gwal;
     }
 
-    pub fn addWorktree(self: *Self, name: []const u8, path: []const u8) !GitWorktree {
+    pub fn addWorktree(self: *Self, name: []const u8, path: []const u8) GitError!GitWorktree {
         assert(self.repo != null);
         var add_opt: c.git_worktree_add_options = undefined;
         add_opt.version = c.GIT_WORKTREE_ADD_OPTIONS_VERSION;
@@ -169,7 +169,7 @@ pub const GitRepo = struct {
         return wt;
     }
 
-    pub fn getBranchList(self: *Self, allocator: Allocator, remote: bool) ![][]const u8 {
+    pub fn getBranchList(self: *Self, allocator: Allocator, remote: bool) (Allocator.Error||GitError)![][]const u8 {
         assert(self.repo != null);
         const size = try self.getBranchListPriv(null, remote);
         var branch_list = try allocator.alloc([]const u8, size);
@@ -177,7 +177,7 @@ pub const GitRepo = struct {
         return branch_list;
     }
 
-    fn getBranchListPriv(self: *Self, branch_list: ?[][]const u8, remote: bool) !usize {
+    fn getBranchListPriv(self: *Self, branch_list: ?[][]const u8, remote: bool) GitError!usize {
         var branch_it: ?*c.git_branch_iterator = null;
         var rc = c.git_branch_iterator_new(&branch_it, self.repo, if (remote) c.GIT_BRANCH_REMOTE else c.GIT_BRANCH_LOCAL);
         try translateError(rc);
@@ -211,7 +211,7 @@ pub fn deinit() void {
     _ = c.git_libgit2_shutdown();
 }
 
-fn translateError(err: c_int) !void {
+fn translateError(err: c_int) GitError!void {
     return switch (err) {
         c.GIT_OK => {},
         c.GIT_ERROR => GitError.ERROR,

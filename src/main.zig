@@ -47,7 +47,7 @@ const App = struct {
         return Self{
             .allocator = allocator,
             .stderr = std.io.getStdErr(),
-            .repo = git2.GitRepo{},
+            .repo = git2.GitRepo{ .allocator = allocator },
             .wt_list = undefined, // see open()
             .main_sb = undefined, // see open()
             .term = term,
@@ -66,6 +66,11 @@ const App = struct {
         self.main_sb = SelectBox.init(10, 20, width, self.wt_list.asSBModel(), KEY_BIND.UP, KEY_BIND.DOWN);
         self.main_sb.box.setTitle("Select git worktree");
         self.main_sb.setEmptyText("No worktrees found in this repository.");
+
+        // change CWD so it's possible to deleted it
+        var repo_dir = try std.fs.openDirAbsolute(self.repo.path.?, .{});
+        defer repo_dir.close();
+        try repo_dir.setAsCwd();
     }
 
     fn deinit(self: *Self) void {
@@ -256,7 +261,7 @@ const WorktreeList = struct {
         return &self.sb_model;
     }
     fn appendOne(self: *Self, wt: git2.GitWorktree) !void {
-        const width = std.math.max(wt.path.len, self.max_path_width);
+        const width = std.math.max(wt.path.len, self.max_path_width + 1);
         const as_text = try formatWorktree(self.allocator, wt, width);
         try self.str_list.append(as_text);
         try self.list.append(wt);

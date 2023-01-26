@@ -67,16 +67,32 @@ pub const GitWorktreeArrayList = std.ArrayList(GitWorktree);
 
 pub const GitRepo = struct {
     const Self = @This();
+    allocator: Allocator,
     repo: ?*c.git_repository = null,
+    path: ?[]const u8 = null,
 
-    pub fn open(self: *Self, path: []const u8) GitError!void {
-        var rc = c.git_repository_open(&self.repo, path.ptr);
+    pub fn open(self: *Self, path: []const u8) (Allocator.Error||GitError)!void {
+        var repo: ?*c.git_repository = null;
+        var rc = c.git_repository_open(&repo, path.ptr);
         try translateError(rc);
+        defer c.git_repository_free(repo); 
+
+        var common_dir = std.mem.sliceTo(c.git_repository_commondir(repo), 0);
+        var last = common_dir.len - 1;
+        if (common_dir[last] == '/') last -= 1;
+        while (common_dir[last] != '/') : (last -= 1) {}
+
+        rc = c.git_repository_open(&self.repo, common_dir);
+        try translateError(rc);
+        self.path = try self.allocator.dupe(u8, common_dir[0..last]);
     }
 
     pub fn close(self: *Self) void {
         if (self.repo) |repo| {
             c.git_repository_free(repo); 
+        }
+        if (self.path) |path| {
+            self.allocator.free(path);
         }
     }
 
@@ -104,22 +120,14 @@ pub const GitRepo = struct {
 
     fn getMainWorktree(self: *Self, wt: *GitWorktree) GitError!void {
         assert(self.repo != null);
-        var common_dir = std.mem.sliceTo(c.git_repository_commondir(self.repo), 0);
-        var last = common_dir.len - 1;
-        if (common_dir[last] == '/') last -= 1;
-        while (common_dir[last] != '/') : (last -= 1) {}
-
-        var repo = GitRepo{};
-        wt.path = common_dir[0..last];
-        try repo.open(wt.path);
-        defer repo.close();
 
         var ref: ?*c.git_reference = null;
-        var rc = c.git_repository_head(&ref, repo.repo);
+        var rc = c.git_repository_head(&ref, self.repo);
         try translateError(rc);
 
         try wt.addBranchNameAndOid(ref.?);
         wt.name = wt.branch_name;
+        wt.path = self.path.?;
         wt.is_main = true;
     }
 

@@ -42,6 +42,8 @@ const App = struct {
     branch_list: ?[][]const u8,
     br_sb_model: ?StringSliceModel,
     exit_code: u8 = 1,
+    width: u16 = undefined,
+    left: u16 = undefined,
 
     fn init(allocator: Allocator, term: *AnsiTerminal) App {
         return Self{
@@ -62,8 +64,9 @@ const App = struct {
     fn open(self: *Self) !void {
         try self.repo.open(".");
         self.wt_list = try WorktreeList.init(self.allocator, &self.repo);
-        const width = @intCast(u16, self.term.size.width - 40);
-        self.main_sb = SelectBox.init(10, 20, width, self.wt_list.asSBModel(), KEY_BIND.UP, KEY_BIND.DOWN);
+        self.width = self.calculateWidth();
+        self.left = @intCast(u16, @divTrunc(self.term.size.width - self.width, 2));
+        self.main_sb = SelectBox.init(10, self.left, self.width, self.wt_list.asSBModel(), KEY_BIND.UP, KEY_BIND.DOWN);
         self.main_sb.box.setTitle("Select git worktree");
         self.main_sb.setEmptyText("No worktrees found in this repository.");
 
@@ -80,6 +83,13 @@ const App = struct {
             self.branch_list = null;
         }
         self.repo.close();
+    }
+
+    fn calculateWidth(self: Self) u16 {
+        return if (self.term.size.width > 80)
+            @intCast(u16, self.term.size.width - @divTrunc(self.term.size.width, 10))
+        else
+            @intCast(u16, self.term.size.width - 2);
     }
 
     fn eventLoop(self: *Self) !void {
@@ -134,8 +144,7 @@ const App = struct {
             KEY_BIND.ADD_NEW => {
                 self.branch_list = try self.repo.getBranchList(self.allocator, false);
                 self.br_sb_model = StringSliceModel.init(self.branch_list.?);
-                const width = @intCast(u16, self.term.size.width - 60);
-                self.branch_sb = SelectBox.init(12, 30, width, &self.br_sb_model.?.sb_model, KEY_BIND.UP, KEY_BIND.DOWN);
+                self.branch_sb = SelectBox.init(12, self.left + 5, self.width - 10, &self.br_sb_model.?.sb_model, KEY_BIND.UP, KEY_BIND.DOWN);
                 self.branch_sb.?.box.setTitle("Select git branch to convert to worktree");
                 self.branch_sb.?.setEmptyText("No branches found in this repository.");
                 try self.branch_sb.?.draw(self.term.stdout);

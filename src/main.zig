@@ -323,21 +323,18 @@ fn statusMessage(top: u16, left: u16, text: []const u8, term: *AnsiTerminal) !vo
     try term.stdout.writeAll(abuf.toSlice());
 }
 
-fn dicoverTempPath(allocator: Allocator) ![]const u8 {
-    if (std.process.hasEnvVarConstant("TMPDIR")) {
-        return try std.process.getEnvVarOwned(allocator, "TMPDIR");
-    } else
-    if (std.process.hasEnvVarConstant("TEMP")) {
-        return try std.process.getEnvVarOwned(allocator, "TEMP");
-    } else
-    if (std.process.hasEnvVarConstant("TMP")) {
-        return try std.process.getEnvVarOwned(allocator, "TMP");
+fn discoverTempPath(allocator: Allocator) ![]const u8 {
+    const temp_vars = [_][]const u8{ "TMPDIR", "TEMP", "TMP" };
+    inline for (temp_vars) |temp_var| {
+        if (std.process.hasEnvVarConstant(temp_var)) {
+            return std.process.getEnvVarOwned(allocator, temp_var);
+        }
     }
-    return error.ENOTFOUND;
+    return allocator.dupe(u8, "/tmp");
 }
 
 fn writeTempFile(allocator: Allocator, text: []const u8) !u8 {
-    const temp_path = try dicoverTempPath(allocator);
+    const temp_path = try discoverTempPath(allocator);
     defer allocator.free(temp_path);
     const temp_dir = try std.fs.openDirAbsolute(temp_path, .{});
     try temp_dir.writeFile("zig-worktree.path", text);

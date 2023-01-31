@@ -5,3 +5,4 @@ pub const SELECT1 = ' ';
 pub const SELECT2 = 13;
 pub const DOWN = 'j';
 pub const UP = 'k';
+pub const REMOTE_TOGGLE = 'r';

@@ -21,6 +21,7 @@ pub fn main() !u8 {
     defer term.deinit();
 
     var app = App.init(allocator, &term);
+
     try app.open();
     defer app.deinit();
     try app.eventLoop();
@@ -42,6 +43,7 @@ const App = struct {
     branch_list: ?[][]const u8,
     br_sb_model: ?StringSliceModel,
     exit_code: u8 = 1,
+    remote_bl: bool = false,
     width: u16 = undefined,
     left: u16 = undefined,
 
@@ -142,12 +144,8 @@ const App = struct {
                 }
             },
             KEY_BIND.ADD_NEW => {
-                self.branch_list = try self.repo.getBranchList(self.allocator, false);
-                self.br_sb_model = StringSliceModel.init(self.branch_list.?);
-                self.branch_sb = SelectBox.init(12, self.left + 5, self.width - 10, &self.br_sb_model.?.sb_model, KEY_BIND.UP, KEY_BIND.DOWN);
-                self.branch_sb.?.box.setTitle("Select git branch to convert to worktree");
-                self.branch_sb.?.setEmptyText("No branches found in this repository.");
-                try self.branch_sb.?.draw(self.term.stdout);
+                self.remote_bl = false;
+                try self.showBranchSelectBox(self.remote_bl);
                 self.focus = .BRANCH_SB;
             },
             KEY_BIND.DELETE => {
@@ -188,25 +186,52 @@ const App = struct {
             },
             KEY_BIND.SELECT1, KEY_BIND.SELECT2 => {
                 if (!self.branch_sb.?.isEmpty()) {
-                    const branch_name = self.branch_list.?[self.branch_sb.?.selected];
+                    var branch_name = self.branch_list.?[self.branch_sb.?.selected];
+                    if (self.remote_bl) {
+                        const remote_branch_name = branch_name;
+                        branch_name = deriveLocalBranchName(remote_branch_name);
+                        try self.repo.checkoutRemoteBranch(remote_branch_name, branch_name);
+                    }
+
                     if (self.wt_list.findByBranchName(branch_name)) |_| {
                         const dialog_top = self.branch_sb.?.box.top + self.branch_sb.?.box.height - 2;
                         const dialog_left = self.branch_sb.?.box.left + 2;
                         const text = "This branch is already binded to a worktree.";
                         try statusMessage(dialog_top, dialog_left, text, self.term);
                     } else {
-                        var path = try std.fmt.allocPrintZ(self.allocator, "../{s}", .{branch_name});
+                        var worktree_name = try deriveWorktreeName(self.allocator, branch_name);
+                        defer self.allocator.free(worktree_name);
+
+                        var path = try std.fmt.allocPrintZ(self.allocator, "../{s}", .{worktree_name});
                         defer self.allocator.free(path);
-                        var newwt = try self.repo.addWorktree(branch_name, path);
+
+                        var newwt = try self.repo.addWorktree(worktree_name, branch_name, path);
                         try self.wt_list.appendOne(newwt);
                         self.main_sb.box.height += 1;
                         return 0;
                     }
                 }
             },
+            KEY_BIND.REMOTE_TOGGLE => {
+                self.remote_bl = if (self.remote_bl) false else true;
+                try self.showBranchSelectBox(self.remote_bl);
+            },
             else => {},
         }
         return 1;
+    }
+
+    fn showBranchSelectBox(self: *Self, remote: bool) !void {
+        if (self.branch_list) |branch_list| {
+            self.allocator.free(branch_list);
+            try self.branch_sb.?.box.clear(self.term.stdout);
+        }
+        self.branch_list = try self.repo.getBranchList(self.allocator, remote);
+        self.br_sb_model = StringSliceModel.init(self.branch_list.?);
+        self.branch_sb = SelectBox.init(12, self.left + 5, self.width - 10, &self.br_sb_model.?.sb_model, KEY_BIND.UP, KEY_BIND.DOWN);
+        self.branch_sb.?.box.setTitle("Select git branch to convert to worktree");
+        self.branch_sb.?.setEmptyText("No branches found in this repository.");
+        try self.branch_sb.?.draw(self.term.stdout);
     }
 };
 
@@ -340,3 +365,20 @@ fn writeTempFile(allocator: Allocator, text: []const u8) !u8 {
     try temp_dir.writeFile("zig-worktree.path", text);
     return 0;
 }
+
+fn deriveLocalBranchName(branch_name: []const u8) []const u8 {
+    var pos: usize = 0;
+    while (branch_name[pos] != '/') : (pos += 1) {}
+    return branch_name[pos + 1 ..];
+}
+
+fn deriveWorktreeName(allocator: Allocator, branch_name: []const u8) ![]const u8 {
+    var name = try allocator.dupeZ(u8, branch_name);
+    for (name) |*ch| {
+        if (ch.* == '/' or ch.* == '\\') {
+            ch.* = '-';
+        }
+    }
+    return name;
+}
+

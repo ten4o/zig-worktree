@@ -153,7 +153,7 @@ pub const GitRepo = struct {
         return gwal;
     }
 
-    pub fn addWorktree(self: *Self, name: []const u8, path: []const u8) GitError!GitWorktree {
+    pub fn addWorktree(self: *Self, name: []const u8, branch_name: []const u8, path: []const u8) GitError!GitWorktree {
         assert(self.repo != null);
         var add_opt: c.git_worktree_add_options = undefined;
         add_opt.version = c.GIT_WORKTREE_ADD_OPTIONS_VERSION;
@@ -161,7 +161,7 @@ pub const GitRepo = struct {
         var rc = c.git_checkout_options_init(&add_opt.checkout_options, c.GIT_CHECKOUT_OPTIONS_VERSION);
         try translateError(rc);
 
-        rc = c.git_branch_lookup(&add_opt.ref, self.repo, name.ptr, c.GIT_BRANCH_LOCAL);
+        rc = c.git_branch_lookup(&add_opt.ref, self.repo, branch_name.ptr, c.GIT_BRANCH_LOCAL);
         try translateError(rc);
 
         var wt: GitWorktree = GitWorktree{ .name = undefined, .path = undefined, .branch_name = undefined };
@@ -206,6 +206,31 @@ pub const GitRepo = struct {
             indx += 1;
         }
         return indx;
+    }
+
+    pub fn checkoutRemoteBranch(self: *Self, remote_branch_name: []const u8, local_branch_name: []const u8) GitError!void {
+        var remote_ref: ?*c.git_reference = null;
+        var local_ref: ?*c.git_reference = null;
+
+         var rc = c.git_branch_lookup(&remote_ref, self.repo, remote_branch_name.ptr, c.GIT_BRANCH_REMOTE);
+         try translateError(rc);
+
+        // Create local branch -> remote_ref
+        var oid = c.git_reference_target(remote_ref);
+        var target_commit: ?*c.git_commit = null;
+        rc = c.git_commit_lookup(&target_commit, self.repo, oid);
+        try translateError(rc);
+
+        rc = c.git_branch_create(&local_ref, self.repo, local_branch_name.ptr, target_commit, 0); 
+        if (rc == c.GIT_EEXISTS) {
+            rc = c.git_branch_lookup(&local_ref, self.repo, local_branch_name.ptr, c.GIT_BRANCH_LOCAL);
+        }
+        try translateError(rc);
+
+        // Set tracking
+        // is remote_branch_name GOOD and what is the CanonicalName of remote_branch_name
+        rc = c.git_branch_set_upstream(local_ref, remote_branch_name.ptr);
+        try translateError(rc);
     }
 };
 

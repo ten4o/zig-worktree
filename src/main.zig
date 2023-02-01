@@ -79,11 +79,14 @@ const App = struct {
     }
 
     fn deinit(self: *Self) void {
-        self.wt_list.deinit();
         if (self.branch_list) |branch_list| {
+            for (branch_list) |item| {
+                self.allocator.free(item);
+            }
             self.allocator.free(branch_list);
             self.branch_list = null;
         }
+        self.wt_list.deinit();
         self.repo.close();
     }
 
@@ -153,7 +156,7 @@ const App = struct {
                     const dialog_top = self.main_sb.box.top + self.main_sb.box.height - 2;
                     const dialog_left = self.main_sb.box.left + 2;
                     var wt = self.wt_list.list.items[self.main_sb.selected];
-                    if (wt.is_main) {
+                    if (wt.isMain()) {
                         const text = "Main worktree cannot be deleted!";
                         try statusMessage(dialog_top, dialog_left, text, self.term);
                     } else {
@@ -223,10 +226,13 @@ const App = struct {
 
     fn showBranchSelectBox(self: *Self, remote: bool) !void {
         if (self.branch_list) |branch_list| {
+            for (branch_list) |item| {
+                self.allocator.free(item);
+            }
             self.allocator.free(branch_list);
             try self.branch_sb.?.box.clear(self.term.stdout);
         }
-        self.branch_list = try self.repo.getBranchList(self.allocator, remote);
+        self.branch_list = try self.repo.getBranchList(remote);
         self.br_sb_model = StringSliceModel.init(self.branch_list.?);
         self.branch_sb = SelectBox.init(12, self.left + 5, self.width - 10, &self.br_sb_model.?.sb_model, KEY_BIND.UP, KEY_BIND.DOWN);
         self.branch_sb.?.box.setTitle("Select git branch to convert to worktree");
@@ -241,7 +247,6 @@ const WorktreeList = struct {
     sb_model: select_box.SBModel,
     list: git2.GitWorktreeArrayList,
     str_list: StringArrayList,
-    //arena: std.heap.ArenaAllocator,
     allocator: Allocator,
     max_path_width: usize,
 
@@ -255,13 +260,11 @@ const WorktreeList = struct {
             },
             .str_list = undefined,
             .list = undefined,
-            //.arena = std.heap.ArenaAllocator.init(allocator),
             .allocator = allocator,
             .max_path_width = 0,
         };
-        //self.allocator = self.arena.allocator();
 
-        self.list = try repo.getWorktreeList(self.allocator);
+        self.list = try repo.getWorktreeList();
         self.max_path_width = 0;
         for (self.list.items) |*wt| {
             if (wt.path.len > self.max_path_width) {
@@ -277,9 +280,15 @@ const WorktreeList = struct {
     }
 
     fn deinit(self: *Self) void {
-        _ = self;
-        // FIXME:
-        //self.arena.deinit();
+        for (self.str_list.items) |item| {
+            self.allocator.free(item);
+        }
+        self.str_list.deinit();
+
+        for (self.list.items) |*item| {
+            item.deinit();
+        }
+        self.list.deinit();
     }
 
     fn findByBranchName(self: Self, name: []const u8) ?*git2.GitWorktree {
@@ -315,8 +324,10 @@ const WorktreeList = struct {
     }
     fn orderedRemove(model: *select_box.SBModel, index: usize) void {
         const self = @fieldParentPtr(Self, "sb_model", model);
-        _ = self.list.orderedRemove(index);
-        _ = self.str_list.orderedRemove(index);
+        var wt = self.list.orderedRemove(index);
+        wt.deinit();
+        const str = self.str_list.orderedRemove(index);
+        self.allocator.free(str);
     }
 };
 

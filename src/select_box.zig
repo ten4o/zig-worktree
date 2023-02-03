@@ -66,30 +66,48 @@ pub const SelectBox = struct {
 
     box: Box,
     model: *SBModel,
-    empty_text: []const u8,
     selected: usize,
-    key_up: u8,
-    key_down: u8,
+    view_offset: usize,
+    view_size: usize,
+    empty_text: []const u8,
+    key_up: u8 = undefined,
+    key_down: u8 = undefined,
 
-    pub fn init(top: u16, left: u16, width: u16, model: *SBModel, comptime key_up: u8, comptime key_down: u8) Self {
+    pub fn init(top: u16, left: u16, width: u16, max_height: u16, model: *SBModel) Self {
+        var height = max_height - 4;
+        if (height > model.length()) {
+            height = @intCast(u16, model.length());
+        }
         return Self{
             .box = Box{
                 .top = top,
                 .left = left,
                 .width = width,
-                .height = @intCast(u16, model.length()) + 4,
+                .height = height + 4,
                 .title = null,
             },
             .model = model,
             .empty_text = "empty",
             .selected = 0,
-            .key_up = key_up,
-            .key_down = key_down,
+            .view_offset = 0,
+            .view_size = height,
         };
     }
 
-    pub fn setEmptyText(self: *Self, text: []const u8) void {
+    pub fn setTitle(self: *Self, text: []const u8) *Self {
+        self.box.setTitle(text);
+        return self;
+    }
+
+    pub fn setEmptyText(self: *Self, text: []const u8) *Self {
         self.empty_text = text;
+        return self;
+    }
+
+    pub fn setKeys(self: *Self, comptime key_up: u8, comptime key_down: u8) *Self {
+        self.key_up = key_up;
+        self.key_down = key_down;
+        return self;
     }
 
     pub fn isEmpty(self: Self) bool {
@@ -113,7 +131,7 @@ pub const SelectBox = struct {
             buf.cursorPos(@intCast(u16, self.box.top + 2), self.box.left + 1);
             _ = try stdout.write(buf.toSlice());
             _ = try stdout.write(self.empty_text);
-        } else for (self.model.items()) |line, i| {
+        } else for (self.model.items()[self.view_offset .. (self.view_offset + self.view_size)]) |line, i| {
             buf.cursorPos(@intCast(u16, self.box.top + i + 2), self.box.left + 1);
             if (i == self.selected) {
                 buf.setBackground(4);
@@ -139,8 +157,13 @@ pub const SelectBox = struct {
         const num_items = self.model.length();
 
         if (ch == self.key_down) {
-            if (self.selected == num_items - 1) {
-                self.selected = 0;
+            if (self.selected == self.view_size - 1) {
+                if (self.view_size == num_items or (self.view_offset + self.selected >= num_items - 1)) {
+                    self.selected = 0;
+                    self.view_offset = 0;
+                } else {
+                    self.view_offset += 1;
+                }
             } else {
                 self.selected += 1;
             }
@@ -149,7 +172,12 @@ pub const SelectBox = struct {
             if (self.selected > 0) {
                 self.selected -= 1;
             } else {
-                self.selected = num_items - 1;
+                if (self.view_offset > 0) {
+                    self.view_offset -= 1;
+                } else {
+                    self.view_offset = num_items - self.view_size;
+                    self.selected = self.view_size - 1;
+                }
             }
             try self.draw(stdout);
         }

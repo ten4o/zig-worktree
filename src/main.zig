@@ -68,9 +68,11 @@ const App = struct {
         self.wt_list = try WorktreeList.init(self.allocator, &self.repo);
         self.width = self.calculateWidth();
         self.left = @intCast(u16, @divTrunc(self.term.size.width - self.width, 2));
-        self.main_sb = SelectBox.init(10, self.left, self.width, self.wt_list.asSBModel(), KEY_BIND.UP, KEY_BIND.DOWN);
-        self.main_sb.box.setTitle("Select git worktree");
-        self.main_sb.setEmptyText("No worktrees found in this repository.");
+        self.main_sb = SelectBox.init(10, self.left, self.width, @intCast(u16, self.term.size.height - 11), self.wt_list.asSBModel());
+        _ = self.main_sb
+                .setKeys(KEY_BIND.UP, KEY_BIND.DOWN)
+                .setEmptyText("No worktrees found in this repository.")
+                .setTitle("Select git worktree");
 
         // change CWD so it's possible to deleted it
         var repo_dir = try std.fs.openDirAbsolute(self.repo.path.?, .{});
@@ -234,9 +236,11 @@ const App = struct {
         }
         self.branch_list = try self.repo.getBranchList(remote);
         self.br_sb_model = StringSliceModel.init(self.branch_list.?);
-        self.branch_sb = SelectBox.init(12, self.left + 5, self.width - 10, &self.br_sb_model.?.sb_model, KEY_BIND.UP, KEY_BIND.DOWN);
-        self.branch_sb.?.box.setTitle("Select git branch to convert to worktree");
-        self.branch_sb.?.setEmptyText("No branches found in this repository.");
+        self.branch_sb = SelectBox.init(12, self.left + 5, self.width - 10, @intCast(u16, self.term.size.height - 12), &self.br_sb_model.?.sb_model);
+        _ = self.branch_sb.?
+                .setKeys(KEY_BIND.UP, KEY_BIND.DOWN)
+                .setEmptyText("No branches found in this repository.")
+                .setTitle("Select git branch to convert to worktree");
         try self.branch_sb.?.draw(self.term.stdout);
     }
 };

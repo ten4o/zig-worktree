@@ -142,7 +142,8 @@ const App = struct {
             },
             KEY_BIND.SELECT1, KEY_BIND.SELECT2 => {
                 if (!self.main_sb.isEmpty()) {
-                    var split_it = std.mem.split(u8, self.wt_list.str_list.items[self.main_sb.selected], " ");
+                    const selectedWT = self.main_sb.getSelectedItem();
+                    var split_it = std.mem.split(u8, selectedWT, " ");
                     const dir = split_it.first();
                     self.exit_code = try writeTempFile(self.allocator, dir);
                     return 0;
@@ -157,7 +158,7 @@ const App = struct {
                 if (!self.main_sb.isEmpty()) {
                     const dialog_top = self.main_sb.box.top + self.main_sb.box.height - 2;
                     const dialog_left = self.main_sb.box.left + 2;
-                    var wt = self.wt_list.list.items[self.main_sb.selected];
+                    var wt = self.wt_list.list.items[self.main_sb.getSelectedIndex()];
                     if (wt.isMain()) {
                         const text = "Main worktree cannot be deleted!";
                         try statusMessage(dialog_top, dialog_left, text, self.term);
@@ -167,9 +168,8 @@ const App = struct {
                         const yn = try ynDialog(dialog_top, dialog_left, text, self.term);
                         if (yn == 'y') {
                             if (wt.delete()) {
-                                self.main_sb.deleteSelected();
                                 try self.main_sb.box.clear(self.term.stdout);
-                                self.main_sb.box.height -= 1;
+                                self.main_sb.deleteSelected();
                             } else |err| {
                                 try self.stderr.writer().print("error {}\n", .{err});
                             }
@@ -191,7 +191,7 @@ const App = struct {
             },
             KEY_BIND.SELECT1, KEY_BIND.SELECT2 => {
                 if (!self.branch_sb.?.isEmpty()) {
-                    var branch_name = self.branch_list.?[self.branch_sb.?.selected];
+                    var branch_name = self.branch_sb.?.getSelectedItem();
                     if (self.remote_bl) {
                         const remote_branch_name = branch_name;
                         branch_name = deriveLocalBranchName(remote_branch_name);
@@ -212,7 +212,7 @@ const App = struct {
 
                         var newwt = try self.repo.addWorktree(worktree_name, branch_name, path);
                         try self.wt_list.appendOne(newwt);
-                        self.main_sb.box.height += 1;
+                        self.main_sb.onNewRow();
                         return 0;
                     }
                 }

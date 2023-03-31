@@ -114,12 +114,34 @@ pub const SelectBox = struct {
         return self.model.isEmpty();
     }
 
+    pub fn onNewRow(self: *Self) void {
+        // TODO: if height too large then don't increase
+        self.box.height += 1;
+        self.view_size += 1;
+    }
+
+    pub fn getSelectedIndex(self: Self) usize {
+        return self.selected + self.view_offset;
+    }
+
+    pub fn getSelectedItem(self: Self) []const u8 {
+        return self.model.items()[self.getSelectedIndex()];
+    }
+
     pub fn deleteSelected(self: *Self) void {
         if (self.isEmpty()) return;
         const num_items = self.model.length();
-        _ = self.model.orderedRemove(self.selected);
+        _ = self.model.orderedRemove(self.getSelectedIndex());
         if (self.selected >= num_items - 1 and self.selected != 0) {
             self.selected -= 1;
+        }
+        if (self.box.height - 4 == self.view_size) {
+            self.box.height -= 1;
+            self.view_size -= 1;
+        } else {
+            if (self.view_offset > 0) {
+                self.view_offset -= 1;
+            }
         }
     }
 
@@ -131,7 +153,7 @@ pub const SelectBox = struct {
             buf.cursorPos(@intCast(u16, self.box.top + 2), self.box.left + 1);
             _ = try stdout.write(buf.toSlice());
             _ = try stdout.write(self.empty_text);
-        } else for (self.model.items()[self.view_offset .. (self.view_offset + self.view_size)]) |line, i| {
+        } else for (self.model.items()[self.view_offset .. (self.view_offset + self.view_size)], 0..) |line, i| {
             buf.cursorPos(@intCast(u16, self.box.top + i + 2), self.box.left + 1);
             if (i == self.selected) {
                 buf.setBackground(4);

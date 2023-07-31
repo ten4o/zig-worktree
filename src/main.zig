@@ -67,12 +67,12 @@ const App = struct {
         try self.repo.open(".");
         self.wt_list = try WorktreeList.init(self.allocator, &self.repo);
         self.width = self.calculateWidth();
-        self.left = @intCast(u16, @divTrunc(self.term.size.width - self.width, 2));
-        self.main_sb = SelectBox.init(10, self.left, self.width, @intCast(u16, self.term.size.height - 11), self.wt_list.asSBModel());
+        self.left = @intCast(@divTrunc(self.term.size.width - self.width, 2));
+        self.main_sb = SelectBox.init(10, self.left, self.width, @intCast(self.term.size.height - 11), self.wt_list.asSBModel());
         _ = self.main_sb
-                .setKeys(KEY_BIND.UP, KEY_BIND.DOWN)
-                .setEmptyText("No worktrees found in this repository.")
-                .setTitle("Select git worktree");
+            .setKeys(KEY_BIND.UP, KEY_BIND.DOWN)
+            .setEmptyText("No worktrees found in this repository.")
+            .setTitle("Select git worktree");
 
         // change CWD so it's possible to deleted it
         var repo_dir = try std.fs.openDirAbsolute(self.repo.path.?, .{});
@@ -94,9 +94,9 @@ const App = struct {
 
     fn calculateWidth(self: Self) u16 {
         return if (self.term.size.width > 80)
-            @intCast(u16, self.term.size.width - @divTrunc(self.term.size.width, 10))
+            @intCast(self.term.size.width - @divTrunc(self.term.size.width, 10))
         else
-            @intCast(u16, self.term.size.width - 2);
+            @intCast(self.term.size.width - 2);
     }
 
     fn eventLoop(self: *Self) !void {
@@ -236,11 +236,11 @@ const App = struct {
         }
         self.branch_list = try self.repo.getBranchList(remote);
         self.br_sb_model = StringSliceModel.init(self.branch_list.?);
-        self.branch_sb = SelectBox.init(12, self.left + 5, self.width - 10, @intCast(u16, self.term.size.height - 12), &self.br_sb_model.?.sb_model);
+        self.branch_sb = SelectBox.init(12, self.left + 5, self.width - 10, @intCast(self.term.size.height - 12), &self.br_sb_model.?.sb_model);
         _ = self.branch_sb.?
-                .setKeys(KEY_BIND.UP, KEY_BIND.DOWN)
-                .setEmptyText("No branches found in this repository.")
-                .setTitle("Select git branch to convert to worktree");
+            .setKeys(KEY_BIND.UP, KEY_BIND.DOWN)
+            .setEmptyText("No branches found in this repository.")
+            .setTitle("Select git branch to convert to worktree");
         try self.branch_sb.?.draw(self.term.stdout);
     }
 };
@@ -308,7 +308,7 @@ const WorktreeList = struct {
         return &self.sb_model;
     }
     fn appendOne(self: *Self, wt: git2.GitWorktree) !void {
-        const width = std.math.max(wt.path.len, self.max_path_width + 1);
+        const width = @max(wt.path.len, self.max_path_width + 1);
         const as_text = try formatWorktree(self.allocator, wt, width);
         try self.str_list.append(as_text);
         try self.list.append(wt);
@@ -336,9 +336,9 @@ const WorktreeList = struct {
 };
 
 fn formatWorktree(allocator: Allocator, wt: git2.GitWorktree, width: usize) ![]const u8 {
-    var buf: [1024] u8 = undefined;
+    var buf: [1024]u8 = undefined;
     std.mem.copy(u8, &buf, wt.path);
-    std.mem.set(u8, buf[wt.path.len..width], ' ');
+    @memset(buf[wt.path.len..width], ' ');
     return try std.fmt.allocPrint(allocator, "{s} {s} [{s}]\n", .{ buf[0..width], wt.oid_as_str[0..6], wt.branch_name });
 }
 
@@ -396,4 +396,3 @@ fn deriveWorktreeName(allocator: Allocator, branch_name: []const u8) ![]const u8
     }
     return name;
 }
-

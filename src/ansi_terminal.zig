@@ -4,7 +4,6 @@ const allocator = std.heap.page_allocator;
 const ansi = @import("ansi_codes.zig");
 const platform = @import("platform.zig").platform;
 
-
 const TermSize = struct {
     width: i32,
     height: i32,
@@ -73,7 +72,7 @@ fn in(needle: u8, comptime slice: []const u8) bool {
 fn detectSize(stdout_file: std.fs.File) !TermSize {
     return switch (builtin.target.os.tag) {
         .windows => detectSizeWindows(stdout_file),
-         else => detectSizePosix(stdout_file.handle),
+        else => detectSizePosix(stdout_file.handle),
     } catch {
         return detectSizeUgly();
     };
@@ -81,11 +80,11 @@ fn detectSize(stdout_file: std.fs.File) !TermSize {
 
 fn detectSizePosix(handle: std.os.fd_t) !TermSize {
     var size = std.mem.zeroes(platform.constants.winsize);
-    const err = std.os.system.ioctl(handle, platform.constants.T.IOCGWINSZ, @ptrToInt(&size));
+    const err = std.os.system.ioctl(handle, platform.constants.T.IOCGWINSZ, @intFromPtr(&size));
     if (std.os.errno(err) != .SUCCESS) {
-        return std.os.unexpectedErrno(@intToEnum(std.os.system.E, err));
+        return std.os.unexpectedErrno(@enumFromInt(err));
     }
-    return TermSize {
+    return TermSize{
         .width = size.ws_col,
         .height = size.ws_row,
     };

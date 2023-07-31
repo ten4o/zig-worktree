@@ -46,7 +46,7 @@ pub fn AnsiBuffer(comptime size: usize) type {
             var stack: [8]u8 = undefined;
             var locnum = num;
             while (locnum > 0) : (locnum /= 10) {
-                stack[i] = @intCast(u8, locnum % 10);
+                stack[i] = @intCast(locnum % 10);
                 i += 1;
             }
             var j: usize = self.pos;

@@ -76,7 +76,7 @@ pub const SelectBox = struct {
     pub fn init(top: u16, left: u16, width: u16, max_height: u16, model: *SBModel) Self {
         var height = max_height - 4;
         if (height > model.length()) {
-            height = @intCast(u16, model.length());
+            height = @intCast(model.length());
         }
         return Self{
             .box = Box{
@@ -150,11 +150,11 @@ pub const SelectBox = struct {
         try self.box.draw(stdout);
 
         if (self.isEmpty()) {
-            buf.cursorPos(@intCast(u16, self.box.top + 2), self.box.left + 1);
+            buf.cursorPos(@intCast(self.box.top + 2), self.box.left + 1);
             _ = try stdout.write(buf.toSlice());
             _ = try stdout.write(self.empty_text);
-        } else for (self.model.items()[self.view_offset .. (self.view_offset + self.view_size)], 0..) |line, i| {
-            buf.cursorPos(@intCast(u16, self.box.top + i + 2), self.box.left + 1);
+        } else for (self.model.items()[self.view_offset..(self.view_offset + self.view_size)], 0..) |line, i| {
+            buf.cursorPos(@intCast(self.box.top + i + 2), self.box.left + 1);
             if (i == self.selected) {
                 buf.setBackground(4);
             }

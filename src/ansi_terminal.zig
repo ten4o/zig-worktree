@@ -1,8 +1,8 @@
 const std = @import("std");
 const builtin = @import("builtin");
-const allocator = std.heap.page_allocator;
 const ansi = @import("ansi_codes.zig");
-const platform = @import("platform.zig").platform;
+const platform = @import("platform.zig");
+const allocator = std.heap.page_allocator;
 
 const TermSize = struct {
     width: i32,
@@ -28,10 +28,7 @@ pub const AnsiTerminal = struct {
         try platform.uncookStdin(stdin_file.handle, &tty_state);
         _ = try stdout.write(ansi.ENTER_SCREEN);
 
-        //jconst colorterm = std.process.getEnvVarOwned(allocator, "COLORTERM") catch "n/a";
-        //try stdout.print("{s}\n", .{colorterm});
-        //const term = std.process.getEnvVarOwned(allocator, "TERM") catch "n/a";
-        //try stdout.print("{s}\n", .{term});
+        // TODO: check COLORTERM
 
         return Self{
             .size = tsize,

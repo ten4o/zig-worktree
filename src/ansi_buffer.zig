@@ -67,9 +67,13 @@ pub fn AnsiBuffer(comptime size: usize) type {
         fn hideCursor(self: *Self) void {
             self.concat(CSI ++ "?25l");
         }
+        pub fn setColor(self: *Self, color: u8) void {
+            self.concat(CSI ++ "38;5;");
+            self.concatU16(color);
+            self.concatChar('m');
+        }
         pub fn setBackground(self: *Self, color: u8) void {
-            self.csi();
-            self.concat("48;5;");
+            self.concat(CSI ++ "48;5;");
             self.concatU16(color);
             self.concatChar('m');
         }

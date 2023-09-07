@@ -26,3 +26,24 @@ pub fn Boxed(comptime def: []const u8) type {
         pub const teeL = def[21..24];
     };
 }
+
+pub const Color = struct {
+    pub const C256 = enum(u8) {
+        black = 0,
+        red = 1,
+        green = 2,
+        olive = 3,
+        blue = 4,
+        purple = 5,
+        cyan = 6,
+        white = 7,
+        gray = 8,
+        bright_red = 9,
+        bright_green = 10,
+        bright_yellow = 11,
+        bright_blue = 12,
+        bright_magenta = 13,
+        bright_cyan = 14,
+        bright_white = 15,
+    };
+};

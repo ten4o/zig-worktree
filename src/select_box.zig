@@ -1,6 +1,7 @@
 const std = @import("std");
 const AnsiBuffer = @import("ansi_buffer.zig").AnsiBuffer;
 const Box = @import("box.zig").Box;
+const ansi = @import("ansi_codes.zig");
 
 //
 pub const SBModel = struct {
@@ -156,7 +157,7 @@ pub const SelectBox = struct {
         } else for (self.model.items()[self.view_offset..(self.view_offset + self.view_size)], 0..) |line, i| {
             buf.cursorPos(@intCast(self.box.top + i + 2), self.box.left + 1);
             if (i == self.selected) {
-                buf.setBackground(4);
+                buf.setBackground(@intFromEnum(ansi.Color.C256.blue));
             }
             _ = try stdout.write(buf.toSlice());
             if (line.len > self.box.width - 2) {

@@ -46,7 +46,6 @@ pub const GitWorktree = struct {
     wt: ?*c.git_worktree = null,
     ref: ?*c.git_reference = null,
 
-
     // pre: self.wt MUST be set
     pub fn init(self: *Self) GitError!void {
         assert(self.wt != null);
@@ -90,7 +89,7 @@ pub const GitWorktree = struct {
 
         self.branch_name = std.mem.sliceTo(branch_name, 0);
         var oid = c.git_reference_target(self.ref);
-        _ = c.git_oid_tostr(&self.oid_as_str, 15, oid);
+        _ = c.git_oid_tostr(&self.oid_as_str, self.oid_as_str.len - 1, oid);
     }
 };
 
@@ -102,11 +101,11 @@ pub const GitRepo = struct {
     repo: ?*c.git_repository = null,
     path: ?[]const u8 = null,
 
-    pub fn open(self: *Self, path: []const u8) (Allocator.Error||GitError)!void {
+    pub fn open(self: *Self, path: []const u8) (Allocator.Error || GitError)!void {
         var repo: ?*c.git_repository = null;
         var rc = c.git_repository_open(&repo, path.ptr);
         try translateError(rc);
-        defer c.git_repository_free(repo); 
+        defer c.git_repository_free(repo);
 
         var common_dir = std.mem.sliceTo(c.git_repository_commondir(repo), 0);
         var last = common_dir.len - 1;
@@ -120,14 +119,14 @@ pub const GitRepo = struct {
 
     pub fn close(self: *Self) void {
         if (self.repo) |repo| {
-            c.git_repository_free(repo); 
+            c.git_repository_free(repo);
         }
         if (self.path) |path| {
             self.allocator.free(path);
         }
     }
 
-    pub fn getWorktreeByName(self: *Self, name: [*c]const u8, wt: *GitWorktree) GitError!void {
+    pub fn getWorktreeByName(self: *Self, name: [*]const u8, wt: *GitWorktree) GitError!void {
         assert(self.repo != null);
         var rc = c.git_worktree_lookup(&wt.wt, self.repo, name);
         try translateError(rc);
@@ -147,7 +146,7 @@ pub const GitRepo = struct {
         return wt.initMain(self.path.?);
     }
 
-    pub fn getWorktreeList(self: *Self) (Allocator.Error||GitError)!GitWorktreeArrayList {
+    pub fn getWorktreeList(self: *Self) (Allocator.Error || GitError)!GitWorktreeArrayList {
         assert(self.repo != null);
         var worktrees: c.git_strarray = undefined;
         var rc = c.git_worktree_list(&worktrees, self.repo);
@@ -156,14 +155,11 @@ pub const GitRepo = struct {
 
         var gwal = try GitWorktreeArrayList.initCapacity(self.allocator, (worktrees.count + 4) * 2);
 
-        var wt: * GitWorktree = gwal.addOneAssumeCapacity();
+        var wt: *GitWorktree = gwal.addOneAssumeCapacity();
         try self.getMainWorktree(wt);
 
-        if (worktrees.count > 0) {
-            var i: usize = 0;
-            while (i < worktrees.count) : (i += 1) {
-                try self.getWorktreeByName(worktrees.strings[i], gwal.addOneAssumeCapacity());
-            }
+        for (0..worktrees.count) |i| {
+            try self.getWorktreeByName(worktrees.strings[i], gwal.addOneAssumeCapacity());
         }
         return gwal;
     }
@@ -185,7 +181,7 @@ pub const GitRepo = struct {
         try translateError(rc);
 
         var oid = c.git_reference_target(add_opt.ref);
-        _ = c.git_oid_tostr(&wt.oid_as_str, 15, oid);
+        _ = c.git_oid_tostr(&wt.oid_as_str, wt.oid_as_str.len - 1, oid);
         wt.path = std.mem.sliceTo(c.git_worktree_path(wt.wt), 0);
         wt.name = std.mem.sliceTo(c.git_worktree_name(wt.wt), 0);
         wt.branch_name = wt.name;
@@ -193,7 +189,7 @@ pub const GitRepo = struct {
         return wt;
     }
 
-    pub fn getBranchList(self: *Self, remote: bool) (Allocator.Error||GitError)![][]const u8 {
+    pub fn getBranchList(self: *Self, remote: bool) (Allocator.Error || GitError)![][]const u8 {
         assert(self.repo != null);
         const size = try self.getBranchListPriv(null, remote);
         var branch_list = try self.allocator.alloc([]const u8, size);
@@ -201,7 +197,7 @@ pub const GitRepo = struct {
         return branch_list;
     }
 
-    fn getBranchListPriv(self: *Self, branch_list: ?[][]const u8, remote: bool) (Allocator.Error||GitError)!usize {
+    fn getBranchListPriv(self: *Self, branch_list: ?[][]const u8, remote: bool) (Allocator.Error || GitError)!usize {
         var branch_it: ?*c.git_branch_iterator = null;
         var rc = c.git_branch_iterator_new(&branch_it, self.repo, if (remote) c.GIT_BRANCH_REMOTE else c.GIT_BRANCH_LOCAL);
         try translateError(rc);
@@ -240,7 +236,7 @@ pub const GitRepo = struct {
         try translateError(rc);
         defer c.git_commit_free(target_commit);
 
-        rc = c.git_branch_create(&local_ref, self.repo, local_branch_name.ptr, target_commit, 0); 
+        rc = c.git_branch_create(&local_ref, self.repo, local_branch_name.ptr, target_commit, 0);
         if (rc == c.GIT_EEXISTS) {
             rc = c.git_branch_lookup(&local_ref, self.repo, local_branch_name.ptr, c.GIT_BRANCH_LOCAL);
         }
@@ -254,7 +250,7 @@ pub const GitRepo = struct {
 };
 
 pub fn init() GitError!void {
-    var rc = c.git_libgit2_init();
+    const rc = c.git_libgit2_init();
     if (rc < 0) {
         try translateError(rc);
     }

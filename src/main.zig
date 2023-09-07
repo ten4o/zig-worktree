@@ -3,6 +3,7 @@ const git2 = @import("git2.zig");
 const select_box = @import("select_box.zig");
 
 const Allocator = std.mem.Allocator;
+const ansi = @import("ansi_codes.zig");
 const AnsiBuffer = @import("ansi_buffer.zig").AnsiBuffer;
 const AnsiTerminal = @import("ansi_terminal.zig").AnsiTerminal;
 const StringArrayList = std.ArrayList([]const u8);
@@ -161,7 +162,7 @@ const App = struct {
                     var wt = self.wt_list.list.items[self.main_sb.getSelectedIndex()];
                     if (wt.isMain()) {
                         const text = "Main worktree cannot be deleted!";
-                        try statusMessage(dialog_top, dialog_left, text, self.term);
+                        try statusMessage(dialog_top, dialog_left, text, self.term.stdout);
                     } else {
                         var text = try std.fmt.allocPrint(self.allocator, "Deleting worktree {s} ... Are you sure? (y/n)", .{wt.name});
                         defer self.allocator.free(text);
@@ -202,7 +203,7 @@ const App = struct {
                         const dialog_top = self.branch_sb.?.box.top + self.branch_sb.?.box.height - 2;
                         const dialog_left = self.branch_sb.?.box.left + 2;
                         const text = "This branch is already binded to a worktree.";
-                        try statusMessage(dialog_top, dialog_left, text, self.term);
+                        try statusMessage(dialog_top, dialog_left, text, self.term.stdout);
                     } else {
                         var worktree_name = try deriveWorktreeName(self.allocator, branch_name);
                         defer self.allocator.free(worktree_name);
@@ -337,7 +338,7 @@ const WorktreeList = struct {
 
 fn formatWorktree(allocator: Allocator, wt: git2.GitWorktree, width: usize) ![]const u8 {
     var buf: [1024]u8 = undefined;
-    std.mem.copy(u8, &buf, wt.path);
+    @memcpy(buf[0..wt.path.len], wt.path);
     @memset(buf[wt.path.len..width], ' ');
     return try std.fmt.allocPrint(allocator, "{s} {s} [{s}]\n", .{ buf[0..width], wt.oid_as_str[0..6], wt.branch_name });
 }
@@ -356,11 +357,14 @@ fn ynDialog(top: u16, left: u16, text: []const u8, term: *AnsiTerminal) !u8 {
     }
 }
 
-fn statusMessage(top: u16, left: u16, text: []const u8, term: *AnsiTerminal) !void {
+fn statusMessage(top: u16, left: u16, text: []const u8, stdout: anytype) !void {
     var abuf = AnsiBuffer(1024).init();
     abuf.cursorPos(top, left);
+    abuf.setColor(@intFromEnum(ansi.Color.C256.bright_white));
+    abuf.setBackground(@intFromEnum(ansi.Color.C256.red));
     abuf.concat(text);
-    try term.stdout.writeAll(abuf.toSlice());
+    abuf.setDefault();
+    try stdout.writeAll(abuf.toSlice());
 }
 
 fn discoverTempPath(allocator: Allocator) ![]const u8 {

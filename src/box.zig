@@ -11,7 +11,7 @@ pub const Box = struct {
     title: ?[]const u8,
 
     pub fn init(top: u16, left: u16, width: u16, height: u16) Self {
-        return Self{
+        return .{
             .top = top,
             .left = left,
             .width = width,

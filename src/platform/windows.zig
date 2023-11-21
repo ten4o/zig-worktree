@@ -35,11 +35,11 @@ pub fn uncookStdin(handle: std.fs.File.Handle, saved_state: *TermAttr) !void {
     res = SetConsoleMode(handle, (mode | ENABLE_VIRTUAL_TERMINAL_INPUT) & ~@as(DWORD, ENABLE_LINE_INPUT));
 }
 pub fn restoreStdout(handle: std.fs.File.Handle, prev_state: TermAttr) !void {
-    var res = SetConsoleMode(handle, prev_state.stdout);
+    const res = SetConsoleMode(handle, prev_state.stdout);
     _ = res;
 }
 pub fn restoreStdin(handle: std.fs.File.Handle, prev_state: TermAttr) !void {
-    var res = SetConsoleMode(handle, prev_state.stdin);
+    const res = SetConsoleMode(handle, prev_state.stdin);
     _ = res;
 }
 

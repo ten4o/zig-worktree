@@ -30,7 +30,7 @@ pub const AnsiTerminal = struct {
 
         // TODO: check COLORTERM
 
-        return Self{
+        return .{
             .size = tsize,
             .stdin = stdin,
             .stdout = stdout,
@@ -44,11 +44,11 @@ pub const AnsiTerminal = struct {
     }
 
     pub fn read(self: Self, buffer: []u8) !usize {
-        var pready: usize = val: {
+        const pready: usize = val: {
             if (builtin.target.os.tag == .windows) {
                 break :val 1;
             } else {
-                var pollfds = [_]std.os.pollfd{std.os.pollfd{ .fd = self.stdin.context.handle, .events = 1, .revents = 0 }};
+                var pollfds = [_]std.os.pollfd{.{ .fd = self.stdin.context.handle, .events = 1, .revents = 0 }};
                 break :val try std.os.poll(&pollfds, -1);
             }
         };
@@ -81,7 +81,7 @@ fn detectSizePosix(handle: std.os.fd_t) !TermSize {
     if (std.os.errno(err) != .SUCCESS) {
         return std.os.unexpectedErrno(@enumFromInt(err));
     }
-    return TermSize{
+    return .{
         .width = size.ws_col,
         .height = size.ws_row,
     };
@@ -93,7 +93,7 @@ fn detectSizeUgly() !TermSize {
     child_proc.stdout_behavior = std.ChildProcess.StdIo.Pipe;
     try child_proc.spawn();
     var child_stdout: [1024]u8 = undefined;
-    var bread = try std.os.read(child_proc.stdout.?.handle, &child_stdout);
+    const bread = try std.os.read(child_proc.stdout.?.handle, &child_stdout);
 
     var line = child_stdout[0..bread];
     while (line.len > 0 and in(line.ptr[line.len - 1], &[_]u8{ 10, 13 })) {

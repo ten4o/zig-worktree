@@ -49,10 +49,10 @@ const App = struct {
     left: u16 = undefined,
 
     fn init(allocator: Allocator, term: *AnsiTerminal) App {
-        return Self{
+        return .{
             .allocator = allocator,
             .stderr = std.io.getStdErr(),
-            .repo = git2.GitRepo{ .allocator = allocator },
+            .repo = .{ .allocator = allocator },
             .wt_list = undefined, // see open()
             .main_sb = undefined, // see open()
             .term = term,
@@ -105,7 +105,7 @@ const App = struct {
 
         var buf: [32]u8 = undefined;
         while (true) {
-            var bread = try self.term.read(&buf);
+            const bread = try self.term.read(&buf);
             //try self.term.stdout.print("{} {x} {x} {x}\n", .{bread, buf[0], buf[1], buf[2]});
 
             if (buf[0] == 0x1b) {
@@ -164,7 +164,7 @@ const App = struct {
                         const text = "Main worktree cannot be deleted!";
                         try statusMessage(dialog_top, dialog_left, text, self.term.stdout);
                     } else {
-                        var text = try std.fmt.allocPrint(self.allocator, "Deleting worktree {s} ... Are you sure? (y/n)", .{wt.name});
+                        const text = try std.fmt.allocPrint(self.allocator, "Deleting worktree {s} ... Are you sure? (y/n)", .{wt.name});
                         defer self.allocator.free(text);
                         const yn = try ynDialog(dialog_top, dialog_left, text, self.term);
                         if (yn == 'y') {
@@ -205,13 +205,13 @@ const App = struct {
                         const text = "This branch is already binded to a worktree.";
                         try statusMessage(dialog_top, dialog_left, text, self.term.stdout);
                     } else {
-                        var worktree_name = try deriveWorktreeName(self.allocator, branch_name);
+                        const worktree_name = try deriveWorktreeName(self.allocator, branch_name);
                         defer self.allocator.free(worktree_name);
 
-                        var path = try std.fmt.allocPrintZ(self.allocator, "../{s}", .{worktree_name});
+                        const path = try std.fmt.allocPrintZ(self.allocator, "../{s}", .{worktree_name});
                         defer self.allocator.free(path);
 
-                        var newwt = try self.repo.addWorktree(worktree_name, branch_name, path);
+                        const newwt = try self.repo.addWorktree(worktree_name, branch_name, path);
                         try self.wt_list.appendOne(newwt);
                         self.main_sb.onNewRow();
                         return 0;
@@ -256,7 +256,7 @@ const WorktreeList = struct {
     max_path_width: usize,
 
     fn init(allocator: Allocator, repo: *git2.GitRepo) !Self {
-        var self = Self{
+        var self: Self = .{
             .sb_model = .{
                 .isEmptyFn = &WorktreeList.isEmpty,
                 .lengthFn = &WorktreeList.length,
@@ -338,8 +338,10 @@ const WorktreeList = struct {
 
 fn formatWorktree(allocator: Allocator, wt: git2.GitWorktree, width: usize) ![]const u8 {
     var buf: [1024]u8 = undefined;
-    @memcpy(buf[0..wt.path.len], wt.path);
-    @memset(buf[wt.path.len..width], ' ');
+    const max_width = @min(buf.len, width);
+    const cur_path_width = @min(buf.len, wt.path.len);
+    @memcpy(buf[0..cur_path_width], wt.path);
+    @memset(buf[wt.path.len..max_width], ' ');
     return try std.fmt.allocPrint(allocator, "{s} {s} [{s}]\n", .{ buf[0..width], wt.oid_as_str[0..6], wt.branch_name });
 }
 
@@ -350,7 +352,7 @@ fn ynDialog(top: u16, left: u16, text: []const u8, term: *AnsiTerminal) !u8 {
     try term.stdout.writeAll(abuf.toSlice());
     var kbuf: [32]u8 = undefined;
     while (true) {
-        var bread = try term.stdin.read(&kbuf);
+        const bread = try term.stdin.read(&kbuf);
         if (bread == 1 and (kbuf[0] == 'y' or kbuf[0] == 'n')) {
             return kbuf[0];
         }
@@ -392,7 +394,7 @@ fn deriveLocalBranchName(branch_name: []const u8) []const u8 {
 }
 
 fn deriveWorktreeName(allocator: Allocator, branch_name: []const u8) ![]const u8 {
-    var name = try allocator.dupeZ(u8, branch_name);
+    const name = try allocator.dupeZ(u8, branch_name);
     for (name) |*ch| {
         if (ch.* == '/' or ch.* == '\\') {
             ch.* = '-';

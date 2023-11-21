@@ -33,7 +33,7 @@ pub const StringSliceModel = struct {
     str_slice: [][]const u8,
 
     pub fn init(str_slice: [][]const u8) Self {
-        return Self{
+        return .{
             .sb_model = .{
                 .isEmptyFn = isEmpty,
                 .lengthFn = length,
@@ -79,8 +79,8 @@ pub const SelectBox = struct {
         if (height > model.length()) {
             height = @intCast(model.length());
         }
-        return Self{
-            .box = Box{
+        return .{
+            .box = .{
                 .top = top,
                 .left = left,
                 .width = width,

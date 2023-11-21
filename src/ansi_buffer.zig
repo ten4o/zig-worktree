@@ -9,7 +9,7 @@ pub fn AnsiBuffer(comptime size: usize) type {
         buf: [size]u8,
 
         pub fn init() Self {
-            return Self{
+            return .{
                 .pos = 0,
                 .buf = undefined,
             };

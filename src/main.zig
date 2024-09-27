@@ -144,7 +144,7 @@ const App = struct {
             KEY_BIND.SELECT1, KEY_BIND.SELECT2 => {
                 if (!self.main_sb.isEmpty()) {
                     const selectedWT = self.main_sb.getSelectedItem();
-                    var split_it = std.mem.split(u8, selectedWT, " ");
+                    var split_it = std.mem.splitScalar(u8, selectedWT, ' ');
                     const dir = split_it.first();
                     self.exit_code = try writeTempFile(self.allocator, dir);
                     return 0;
@@ -316,19 +316,19 @@ const WorktreeList = struct {
     }
 
     fn isEmpty(model: *select_box.SBModel) bool {
-        const self = @fieldParentPtr(Self, "sb_model", model);
+        const self = @as(*Self, @fieldParentPtr("sb_model", model));
         return self.str_list.items.len <= 0;
     }
     fn length(model: *select_box.SBModel) usize {
-        const self = @fieldParentPtr(Self, "sb_model", model);
+        const self = @as(*Self, @fieldParentPtr("sb_model", model));
         return self.str_list.items.len;
     }
     fn items(model: *select_box.SBModel) [][]const u8 {
-        const self = @fieldParentPtr(Self, "sb_model", model);
+        const self = @as(*Self, @fieldParentPtr("sb_model", model));
         return self.str_list.items;
     }
     fn orderedRemove(model: *select_box.SBModel, index: usize) void {
-        const self = @fieldParentPtr(Self, "sb_model", model);
+        const self = @as(*Self, @fieldParentPtr("sb_model", model));
         var wt = self.list.orderedRemove(index);
         wt.deinit();
         const str = self.str_list.orderedRemove(index);
@@ -383,7 +383,7 @@ fn writeTempFile(allocator: Allocator, text: []const u8) !u8 {
     const temp_path = try discoverTempPath(allocator);
     defer allocator.free(temp_path);
     const temp_dir = try std.fs.openDirAbsolute(temp_path, .{});
-    try temp_dir.writeFile("zig-worktree.path", text);
+    try temp_dir.writeFile(.{ .sub_path = "zig-worktree.path", .data = text });
     return 0;
 }
 

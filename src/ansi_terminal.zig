@@ -48,8 +48,8 @@ pub const AnsiTerminal = struct {
             if (builtin.target.os.tag == .windows) {
                 break :val 1;
             } else {
-                var pollfds = [_]std.os.pollfd{.{ .fd = self.stdin.context.handle, .events = 1, .revents = 0 }};
-                break :val try std.os.poll(&pollfds, -1);
+                var pollfds = [_]std.posix.pollfd{.{ .fd = self.stdin.context.handle, .events = 1, .revents = 0 }};
+                break :val try std.posix.poll(&pollfds, -1);
             }
         };
         if (pready > 0) {
@@ -75,32 +75,32 @@ fn detectSize(stdout_file: std.fs.File) !TermSize {
     };
 }
 
-fn detectSizePosix(handle: std.os.fd_t) !TermSize {
+fn detectSizePosix(handle: std.fs.File.Handle) !TermSize {
     var size = std.mem.zeroes(platform.constants.winsize);
-    const err = std.os.system.ioctl(handle, platform.constants.T.IOCGWINSZ, @intFromPtr(&size));
-    if (std.os.errno(err) != .SUCCESS) {
-        return std.os.unexpectedErrno(@enumFromInt(err));
+    const err = std.c.ioctl(handle, platform.constants.T.IOCGWINSZ, @intFromPtr(&size));
+    if (std.posix.errno(err) != .SUCCESS) {
+        return std.posix.unexpectedErrno(@enumFromInt(err));
     }
     return .{
-        .width = size.ws_col,
-        .height = size.ws_row,
+        .width = size.col,
+        .height = size.row,
     };
 }
 
 fn detectSizeUgly() !TermSize {
     const argv = [_][]const u8{ "stty", "size" };
-    var child_proc = std.ChildProcess.init(&argv, allocator);
-    child_proc.stdout_behavior = std.ChildProcess.StdIo.Pipe;
+    var child_proc = std.process.Child.init(&argv, allocator);
+    child_proc.stdout_behavior = std.process.Child.StdIo.Pipe;
     try child_proc.spawn();
     var child_stdout: [1024]u8 = undefined;
-    const bread = try std.os.read(child_proc.stdout.?.handle, &child_stdout);
+    const bread = try std.posix.read(child_proc.stdout.?.handle, &child_stdout);
 
     var line = child_stdout[0..bread];
     while (line.len > 0 and in(line.ptr[line.len - 1], &[_]u8{ 10, 13 })) {
         line.len -= 1;
     }
     var tsize: TermSize = undefined;
-    var iter = std.mem.split(u8, line, " ");
+    var iter = std.mem.splitScalar(u8, line, ' ');
     var token_n: u8 = 0;
     while (iter.next()) |token| {
         if (token_n == 0) {

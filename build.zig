@@ -20,25 +20,25 @@ pub fn build(b: *std.Build) void {
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
     const optimize = b.standardOptimizeOption(.{});
 
-    const exe = b.addExecutable(.{ .name = "zig-worktree", .root_source_file = std.build.FileSource.relative("src/main.zig"), .target = target, .optimize = optimize });
-    addPaths(exe);
+    const exe = b.addExecutable(.{ .name = "zig-worktree", .root_source_file = b.path("src/main.zig"), .target = target, .optimize = optimize });
+    addPaths(exe, b);
     exe.linkSystemLibrary("git2");
     exe.linkLibC();
     //exe.install();
     b.installArtifact(exe);
 
-    const exe_tests = b.addTest(.{ .name = "zig-worktree", .root_source_file = std.build.FileSource.relative("src/main.zig"), .target = target, .optimize = optimize });
+    const exe_tests = b.addTest(.{ .name = "zig-worktree", .root_source_file = b.path("src/main.zig"), .target = target, .optimize = optimize });
 
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&exe_tests.step);
 }
 
 // add `include` and `lib` paths
-fn addPaths(exe: *std.build.CompileStep) void {
+fn addPaths(exe: *std.Build.Step.Compile, b: *std.Build) void {
     switch (builtin.target.os.tag) {
         .windows => {
-            exe.addIncludePath(std.build.LazyPath.relative("./deps/include"));
-            exe.addLibraryPath(std.build.LazyPath.relative("./deps/lib"));
+            exe.addIncludePath(b.path("./deps/include"));
+            exe.addLibraryPath(b.path("./deps/lib"));
         },
         .freebsd, .openbsd, .netbsd, .linux => {
             // use system paths

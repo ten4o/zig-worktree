@@ -29,12 +29,12 @@ pub fn AnsiBuffer(comptime size: usize) type {
             var i: usize = self.pos;
             const limit = fsize * char.len + self.pos;
             while (i < limit) : (i += char.len) {
-                std.mem.copy(u8, self.buf[i..], char);
+                std.mem.copyForwards(u8, self.buf[i..], char);
             }
             self.pos += limit;
         }
         pub fn concat(self: *Self, s: []const u8) void {
-            std.mem.copy(u8, self.buf[self.pos..], s);
+            std.mem.copyForwards(u8, self.buf[self.pos..], s);
             self.pos += s.len;
         }
         pub fn concatChar(self: *Self, char: u8) void {
@@ -57,7 +57,6 @@ pub fn AnsiBuffer(comptime size: usize) type {
             self.pos = j;
         }
         pub fn cursorPos(self: *Self, top: u16, left: u16) void {
-            // CSI v ; h H	- Cursor Position
             self.csi();
             self.concatU16(top);
             self.concatChar(';');

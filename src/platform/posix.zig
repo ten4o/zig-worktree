@@ -13,21 +13,23 @@ pub const constants = switch (builtin.target.os.tag) {
 pub const TermAttr = constants.termios;
 
 pub fn uncookStdout(handle: std.fs.File.Handle, saved_state: *TermAttr) !void {
-    var attr = try std.os.tcgetattr(handle);
+    var attr = try std.posix.tcgetattr(handle);
     saved_state.* = attr;
-    attr.lflag &= ~@as(std.os.system.tcflag_t, constants.ECHO | constants.ICANON);
+    attr.lflag.ECHO = false;
+    attr.lflag.ICANON = false;
 
-    attr.iflag &= ~@as(std.os.system.tcflag_t, constants.ICRNL);
+    attr.iflag.ICRNL = false;
+
     // Disable output processing. Common output processing includes prefixing
     // newline with a carriage return.
-    attr.oflag &= ~@as(std.os.system.tcflag_t, constants.OPOST);
+    attr.oflag.OPOST = false;
 
     // With these settings, the read syscall will immediately return when it
     // can't get any bytes. This allows poll to drive our loop.
-    attr.cc[constants.V.TIME] = 0;
-    attr.cc[constants.V.MIN] = 0;
+    attr.cc[@intFromEnum(std.c.V.TIME)] = 0;
+    attr.cc[@intFromEnum(std.c.V.MIN)] = 0;
 
-    try std.os.tcsetattr(handle, .FLUSH, attr);
+    try std.posix.tcsetattr(handle, .FLUSH, attr);
 }
 
 pub fn uncookStdin(handle: std.fs.File.Handle, saved_state: *TermAttr) !void {
@@ -35,7 +37,7 @@ pub fn uncookStdin(handle: std.fs.File.Handle, saved_state: *TermAttr) !void {
     _ = saved_state;
 }
 pub fn restoreStdout(handle: std.fs.File.Handle, prev_state: TermAttr) !void {
-    try std.os.tcsetattr(handle, .FLUSH, prev_state);
+    try std.posix.tcsetattr(handle, .FLUSH, prev_state);
 }
 pub fn restoreStdin(handle: std.fs.File.Handle, prev_state: TermAttr) !void {
     _ = handle;

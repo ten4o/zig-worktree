@@ -44,15 +44,15 @@ pub const StringSliceModel = struct {
         };
     }
     pub fn isEmpty(model: *SBModel) bool {
-        const self = @fieldParentPtr(Self, "sb_model", model);
+        const self = @as(*Self, @fieldParentPtr("sb_model", model));
         return self.str_slice.len <= 0;
     }
     pub fn length(model: *SBModel) usize {
-        const self = @fieldParentPtr(Self, "sb_model", model);
+        const self = @as(*Self, @fieldParentPtr("sb_model", model));
         return self.str_slice.len;
     }
     pub fn items(model: *SBModel) [][]const u8 {
-        const self = @fieldParentPtr(Self, "sb_model", model);
+        const self = @as(*Self, @fieldParentPtr("sb_model", model));
         return self.str_slice;
     }
     pub fn orderedRemove(model: *SBModel, index: usize) void {
